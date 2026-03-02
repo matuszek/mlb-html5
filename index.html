@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MLB Scoreboard</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0.5rem auto 1rem;
+      padding: 0 0.5rem;
+      max-width: 100%;
+      background-color: #5b8962;
+    }
+    h1 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .date-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    .date-row label { font-size: 0.9rem; }
+    .date-row input[type="date"],
+    .date-row input[type="password"],
+    .date-row input[type="text"] {
+      padding: 0.35rem 0.5rem;
+      font-size: 0.9rem;
+    }
+    #api-key { min-width: 16em; }
+    .date-row button {
+      padding: 0.35rem 0.75rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    #out {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .game {
+      padding: 2px 3px;
+      border: 1px solid #ddd;
+      background: #fafafa;
+      flex: 0 0 var(--game-width, 90px);
+      width: var(--game-width, 90px);
+      min-width: 0;
+      overflow: hidden;
+      container-type: inline-size;
+      display: flex;
+      align-items: center;
+    }
+    .game-teams {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 4px;
+      line-height: 1.2;
+      min-width: 0;
+    }
+    .team {
+      font-size: 0.8rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .team-name {
+      font-size: 0.75rem;
+    }
+    @container (max-width: 130px) { .team { font-size: 0.65rem; } .team-name { font-size: 0.65rem; } }
+    @container (max-width: 100px) { .team { font-size: 0.55rem; } .team-name { font-size: 0.55rem; } }
+    .team img {
+      height: 1em;
+      width: auto;
+      flex-shrink: 0;
+      vertical-align: middle;
+    }
+    .score { font-size: 0.8rem; font-weight: 600; min-width: 1.5ch; text-align: right; }
+    .status {
+      font-size: 0.75rem;
+      color: #a5a5a5;
+      flex-shrink: 0;
+      margin-left: 5px;
+    }
+    .loading, .error { font-size: 0.9rem; margin-top: 0.5rem; }
+    .error { color: #c00; }
+    .empty { color: #666; font-style: italic; }
+  </style>
+</head>
+<body>
+  <div id="out"></div>
+  <div class="date-row">
+    <label for="date">Date</label>
+    <input type="date" id="date" />
+    <button type="button" id="go">Go</button>
+  </div>
+  <div class="date-row">
+    <label for="api-key">API key</label>
+    <input type="password" id="api-key" placeholder="BallDontLie.io key" autocomplete="off" />
+  </div>
+
+  <script>
+    (function () {
+      const BASE = 'https://api.balldontlie.io';
+
+      const dateEl = document.getElementById('date');
+      const goBtn = document.getElementById('go');
+      const outEl = document.getElementById('out');
+      const apiKeyEl = document.getElementById('api-key');
+
+      function today() {
+        const d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      }
+
+      function setDateToToday() {
+        dateEl.value = today();
+      }
+
+      setDateToToday();
+
+      // Map team name (any common variant) to MLB static logo ID. IDs from MLB.com/team CDN.
+      var TEAM_NAME_TO_LOGO_ID = {
+        'orioles': 110, 'baltimore orioles': 110, 'baltimore': 110,
+        'red sox': 111, 'boston red sox': 111, 'boston': 111,
+        'yankees': 147, 'new york yankees': 147, 'ny yankees': 147,
+        'rays': 139, 'tampa bay rays': 139, 'tampa bay': 139,
+        'blue jays': 141, 'toronto blue jays': 141, 'toronto': 141,
+        'white sox': 145, 'chicago white sox': 145, 'chi white sox': 145,
+        'guardians': 114, 'cleveland guardians': 114, 'cleveland': 114,
+        'tigers': 116, 'detroit tigers': 116, 'detroit': 116,
+        'royals': 118, 'kansas city royals': 118, 'kansas city': 118,
+        'twins': 142, 'minnesota twins': 142, 'minnesota': 142,
+        'athletics': 133, 'oakland athletics': 133, 'oakland': 133,
+        'astros': 117, 'houston astros': 117, 'houston': 117,
+        'angels': 108, 'los angeles angels': 108, 'la angels': 108,
+        'mariners': 136, 'seattle mariners': 136, 'seattle': 136,
+        'rangers': 140, 'texas rangers': 140, 'texas': 140,
+        'braves': 144, 'atlanta braves': 144, 'atlanta': 144,
+        'marlins': 146, 'miami marlins': 146, 'miami': 146,
+        'mets': 121, 'new york mets': 121, 'ny mets': 121,
+        'phillies': 143, 'philadelphia phillies': 143, 'philadelphia': 143,
+        'nationals': 120, 'washington nationals': 120, 'washington': 120,
+        'cubs': 112, 'chicago cubs': 112, 'chi cubs': 112,
+        'reds': 113, 'cincinnati reds': 113, 'cincinnati': 113,
+        'brewers': 158, 'milwaukee brewers': 158, 'milwaukee': 158,
+        'pirates': 134, 'pittsburgh pirates': 134, 'pittsburgh': 134,
+        'cardinals': 138, 'st. louis cardinals': 138, 'st louis cardinals': 138, 'st. louis': 138, 'st louis': 138,
+        'diamondbacks': 109, 'arizona diamondbacks': 109, 'arizona': 109, 'd-backs': 109, 'dbacks': 109,
+        'rockies': 115, 'colorado rockies': 115, 'colorado': 115,
+        'dodgers': 119, 'los angeles dodgers': 119, 'la dodgers': 119,
+        'padres': 135, 'san diego padres': 135, 'san diego': 135,
+        'giants': 137, 'san francisco giants': 137, 'san francisco': 137
+      };
+      function teamNameToLogoUrl(name) {
+        if (!name || typeof name !== 'string') return '';
+        var key = name.trim().toLowerCase();
+        var id = TEAM_NAME_TO_LOGO_ID[key];
+        return id ? id + '.svg' : '';
+      }
+
+      function teamName(team) {
+        if (!team) return '—';
+        return team.short_display_name || team.display_name || team.name || '—';
+      }
+
+      function formatScore(runs) {
+        if (runs === 1) return '1\u2009';
+        return runs;
+      }
+
+      function teamLogo(team) {
+        if (!team) return '';
+        var url = teamNameToLogoUrl(teamName(team));
+        if (!url) return '';
+        return '<img src="' + url + '" alt="" />';
+      }
+
+      function inningText(n) {
+        function ordinal(n) {
+          var s = ["th","st","nd","rd"],
+          v = n%100;
+          return n + (s[(v-20)%10] || s[v] || s[0]);
+        }
+        return ordinal(n);
+      }
+
+      function statusText(status, n) {
+        if (!status) return '';
+        switch (status) {
+          case 'STATUS_FINAL':
+            return 'F';
+          case 'STATUS_IN_PROGRESS':
+            // return inningText(n);
+            return n;
+          case 'STATUS_NOT_STARTED':
+            return 'Not Started';
+          case 'STATUS_SUSPENDED':
+            return 'Suspended';
+          case 'STATUS_DELAYED':
+            return 'Delayed';
+          case 'STATUS_POSTPONED':
+            return 'Postponed';
+          case 'STATUS_CANCELLED':
+            return 'Cancelled';
+          case 'STATUS_UNKNOWN':
+            return 'Unknown';
+          default:
+            return status;
+        }
+      }
+      
+      var GAP = 4;
+      var MIN_BOX = 90;
+
+      function updateGameWidth() {
+        var games = outEl.querySelectorAll('.game');
+        if (games.length === 0) return;
+        var w = outEl.clientWidth;
+        var cols = Math.max(1, Math.floor((w + GAP) / (MIN_BOX + GAP)));
+        var boxWidth = (w - (cols - 1) * GAP) / cols;
+        outEl.style.setProperty('--game-width', boxWidth + 'px');
+      }
+
+      function render(games) {
+        if (!games || games.length === 0) {
+          outEl.innerHTML = '<p class="empty">No games on this date.</p>';
+          return;
+        }
+        outEl.innerHTML = games.map(function (g) {
+          var away = g.away_team;
+          var home = g.home_team;
+          var awayRuns = g.away_team_data && g.away_team_data.runs != null ? g.away_team_data.runs : '–';
+          var homeRuns = g.home_team_data && g.home_team_data.runs != null ? g.home_team_data.runs : '–';
+          return (
+            '<div class="game">' +
+              '<div class="game-teams">' +
+                '<div class="row"><span class="team">' + teamLogo(away) + '<span class="team-name">' + teamName(away) + '</span></span><span class="score">' + formatScore(awayRuns) + '</span></div>' +
+                '<div class="row"><span class="team">' + teamLogo(home) + '<span class="team-name">' + teamName(home) + '</span></span><span class="score">' + formatScore(homeRuns) + '</span></div>' +
+              '</div>' +
+              '<div class="status">' + statusText(g.status, g.period) + '</div>' +
+            '</div>'
+          );
+        }).join('');
+        updateGameWidth();
+      }
+
+      function load() {
+        var date = dateEl.value || today();
+        outEl.innerHTML = '<p class="loading">Loading…</p>';
+
+        var url = BASE + '/mlb/v1/games?dates[]=' + encodeURIComponent(date) + '&per_page=50';
+        fetch(url, {
+          headers: { 'Authorization': apiKeyEl.value.trim() }
+        })
+          .then(function (r) {
+            if (!r.ok) throw new Error('API error: ' + r.status + ' ' + r.statusText);
+            return r.json();
+          })
+          .then(function (json) {
+            var data = json.data;
+            render(Array.isArray(data) ? data : []);
+          })
+          .catch(function (err) {
+            outEl.innerHTML = '<p class="error">' + (err.message || 'Failed to load games.') + '</p>';
+          });
+      }
+
+      goBtn.addEventListener('click', load);
+      dateEl.addEventListener('change', load);
+      window.addEventListener('resize', updateGameWidth);
+      load();
+    })();
+  </script>
+</body>
+</html>
