@@ -80,6 +80,7 @@
     .team-name.short { display: none; }
     #out.abbrev .team-name.long { display: none; }
     #out.abbrev .team-name.short { display: inline; }
+    #out.abbrev .game { padding: 1px 3px; }
     .team-name.winner { font-weight: bold; }
     @container (max-width: 130px) { .team { font-size: 0.65rem; } .team-name { font-size: 0.65rem; } }
     @container (max-width: 100px) { .team { font-size: 0.55rem; } .team-name { font-size: 0.55rem; } }
@@ -109,6 +110,13 @@
       color: #a5a5a5;
       font-weight: 500;
       font-size: 0.55rem;
+    }
+    #out.abbrev .status-time {
+      font-size: 0.4rem;
+      letter-spacing: -0.03em;
+    }
+    #out.abbrev .status-time.status-time-4digit {
+      letter-spacing: -0.12em;
     }
     .status-state {
       color: #a5a5a5;
@@ -386,7 +394,7 @@
                 '<div class="row"><span class="team away">' + teamLogo(away) + '<span class="' + awayNameClass + ' long">' + teamNameForDisplay(teamName(away)) + '</span><span class="' + awayNameClass + ' short">' + teamAbbrev(away) + '</span></span>' + awayScoreHtml + '</div>' +
                 '<div class="row"><span class="team home">' + teamLogo(home) + '<span class="' + homeNameClass + ' long">' + teamNameForDisplay(teamName(home)) + '</span><span class="' + homeNameClass + ' short">' + teamAbbrev(home) + '</span></span>' + homeScoreHtml + '</div>' +
               '</div>' +
-              '<div class="status ' + (g.status === 'STATUS_SCHEDULED' ? 'status-time' : 'status-state') + '">' + statusText(g) + '</div>' +
+              '<div class="status ' + (g.status === 'STATUS_SCHEDULED' ? 'status-time' + (statusText(g).indexOf(':') === 2 ? ' status-time-4digit' : '') : 'status-state') + '">' + statusText(g) + '</div>' +
             '</div>'
           );
         }).join('');
