@@ -41,7 +41,6 @@
     }
     .game {
       padding: 2px 3px;
-      border: 1px solid #ddd;
       background: #fafafa;
       flex: 0 0 var(--game-width, 90px);
       width: var(--game-width, 90px);
@@ -75,6 +74,7 @@
     }
     .team-name {
       font-size: 0.75rem;
+      margin-left: 0.1em;
     }
     .team-name.winner { font-weight: bold; }
     @container (max-width: 130px) { .team { font-size: 0.65rem; } .team-name { font-size: 0.65rem; } }
@@ -84,10 +84,16 @@
       width: auto;
       flex-shrink: 0;
       vertical-align: middle;
-      transform: scale(1.6);
-      transform-origin: center center;
       position: relative;
       z-index: 1;
+    }
+    .team.away img {
+      transform: scale(1.5) translateY(-0.05em);
+      transform-origin: center center;
+    }
+    .team.home img {
+      transform: scale(1.5) translateY(0.05em);
+      transform-origin: center center;
     }
     .score { font-size: 0.8rem; font-weight: 600; min-width: 1.5ch; text-align: right; }
     .status {
@@ -297,8 +303,8 @@
           return (
             '<div class="game">' +
               '<div class="game-teams">' +
-                '<div class="row"><span class="team">' + teamLogo(away) + '<span class="' + awayNameClass + '">' + teamName(away) + '</span></span>' + awayScoreHtml + '</div>' +
-                '<div class="row"><span class="team">' + teamLogo(home) + '<span class="' + homeNameClass + '">' + teamName(home) + '</span></span>' + homeScoreHtml + '</div>' +
+                '<div class="row"><span class="team away">' + teamLogo(away) + '<span class="' + awayNameClass + '">' + teamName(away) + '</span></span>' + awayScoreHtml + '</div>' +
+                '<div class="row"><span class="team home">' + teamLogo(home) + '<span class="' + homeNameClass + '">' + teamName(home) + '</span></span>' + homeScoreHtml + '</div>' +
               '</div>' +
               '<div class="status">' + statusText(g) + '</div>' +
             '</div>'
