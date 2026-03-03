@@ -8,8 +8,8 @@
     * { box-sizing: border-box; }
     body {
       font-family: system-ui, -apple-system, sans-serif;
-      margin: 0.5rem auto 1rem;
-      padding: 0 0.5rem;
+      margin: 0 auto;
+      padding: 4px;
       max-width: 100%;
       background-color: #5b8962;
     }
@@ -101,15 +101,22 @@
     .score { font-size: 0.8rem; font-weight: 600; min-width: 1.5ch; text-align: right; }
     .status {
       font-size: 0.75rem;
-      color: #a5a5a5;
       flex-shrink: 0;
       margin-left: 5px;
+    }
+    .status-time {
+      color: #a5a5a5;
+      font-weight: 500;
+      font-size: 0.55rem;
+    }
+    .status-state {
+      color: #a5a5a5;
     }
     .loading, .error { font-size: 0.9rem; margin-top: 0.5rem; }
     .error { color: #c00; }
     .empty { color: #666; font-style: italic; }
     body.inputs-hidden > .date-row { display: none; }
-    body.inputs-hidden { margin-bottom: 0; }
+    body.inputs-hidden { padding-bottom: 0; }
   </style>
 </head>
 <body>
@@ -325,7 +332,7 @@
                 '<div class="row"><span class="team away">' + teamLogo(away) + '<span class="' + awayNameClass + ' long">' + teamName(away) + '</span><span class="' + awayNameClass + ' short">' + teamAbbrev(away) + '</span></span>' + awayScoreHtml + '</div>' +
                 '<div class="row"><span class="team home">' + teamLogo(home) + '<span class="' + homeNameClass + ' long">' + teamName(home) + '</span><span class="' + homeNameClass + ' short">' + teamAbbrev(home) + '</span></span>' + homeScoreHtml + '</div>' +
               '</div>' +
-              '<div class="status">' + statusText(g) + '</div>' +
+              '<div class="status ' + (g.status === 'STATUS_SCHEDULED' ? 'status-time' : 'status-state') + '">' + statusText(g) + '</div>' +
             '</div>'
           );
         }).join('');
