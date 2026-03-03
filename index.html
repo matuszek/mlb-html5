@@ -124,6 +124,7 @@
       const outEl = document.getElementById('out');
       const apiKeyEl = document.getElementById('api-key');
       var STORAGE_KEY = 'mlb-api-key';
+      var DATE_STORAGE_KEY = 'mlb-date';
 
       try {
         var saved = localStorage.getItem(STORAGE_KEY);
@@ -141,11 +142,19 @@
         return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
       }
 
-      function setDateToToday() {
+      try {
+        var savedDate = localStorage.getItem(DATE_STORAGE_KEY);
+        if (savedDate) dateEl.value = savedDate;
+        else dateEl.value = today();
+      } catch (e) {
         dateEl.value = today();
       }
 
-      setDateToToday();
+      function saveDate() {
+        try {
+          localStorage.setItem(DATE_STORAGE_KEY, dateEl.value);
+        } catch (e) {}
+      }
 
       // Map team name (any common variant) to MLB static logo ID. IDs from MLB.com/team CDN.
       var TEAM_NAME_TO_LOGO_ID = {
@@ -316,7 +325,7 @@
       }
 
       goBtn.addEventListener('click', load);
-      dateEl.addEventListener('change', load);
+      dateEl.addEventListener('change', function () { saveDate(); load(); });
       window.addEventListener('resize', updateGameWidth);
       document.addEventListener('keydown', function (e) {
         if (e.key === 'h' || e.key === 'H') {
