@@ -113,8 +113,16 @@
     .status-state {
       color: #a5a5a5;
     }
-    .loading, .error { font-size: 0.9rem; margin-top: 0.5rem; }
-    .error { color: #c00; }
+    .loading { font-size: 0.9rem; margin-top: 0.5rem; }
+    .error {
+      font-size: 1rem;
+      margin-top: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid #c00;
+      background: #fff5f5;
+      color: #c00;
+      border-radius: 4px;
+    }
     .empty { color: #666; font-style: italic; }
     body.inputs-hidden > .date-row { display: none; }
     body.inputs-hidden { padding-bottom: 0; }
@@ -401,7 +409,11 @@
           headers: { 'Authorization': apiKeyEl.value.trim() }
         })
           .then(function (r) {
-            if (!r.ok) throw new Error('API error: ' + r.status + ' ' + r.statusText);
+            if (!r.ok) {
+              var e = new Error('API error: ' + r.status + ' ' + r.statusText);
+              e.status = r.status;
+              throw e;
+            }
             return r.json();
           })
           .then(function (json) {
@@ -413,9 +425,14 @@
             showCacheUpdated(cachedAt);
           })
           .catch(function (err) {
-            delete gamesCache[date];
-            saveGamesCache();
-            outEl.innerHTML = '<p class="error">' + (err.message || 'Failed to load games.') + '</p>';
+            if (err.status !== 429) {
+              delete gamesCache[date];
+              saveGamesCache();
+            }
+            var msg = err.status === 429
+              ? 'Oops, rate limit exceeded. I\'m calling a free API for these scores lol.\n\nPlease wait a full MINUTE (sixty seconds) and try again.'
+              : (err.message || 'Failed to load games.');
+            outEl.innerHTML = '<p class="error">' + msg + '</p>';
           });
       }
 
