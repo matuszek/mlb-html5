@@ -270,7 +270,7 @@
       function teamNameToLogoUrl(name) {
         if (!name || typeof name !== 'string') return '';
         var id = TEAM_NAME_TO_LOGO_ID[(name.trim().toLowerCase())];
-        return id ? id + '.svg' : '';
+        return id ? 'logos/' + id + '.svg' : '';
       }
 
       function teamName(team) {
