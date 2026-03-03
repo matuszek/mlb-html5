@@ -76,6 +76,9 @@
       font-size: 0.75rem;
       margin-left: 0.1em;
     }
+    .team-name.short { display: none; }
+    #out.abbrev .team-name.long { display: none; }
+    #out.abbrev .team-name.short { display: inline; }
     .team-name.winner { font-weight: bold; }
     @container (max-width: 130px) { .team { font-size: 0.65rem; } .team-name { font-size: 0.65rem; } }
     @container (max-width: 100px) { .team { font-size: 0.55rem; } .team-name { font-size: 0.55rem; } }
@@ -209,6 +212,11 @@
         return team.short_display_name || team.display_name || team.name || '—';
       }
 
+      function teamAbbrev(team) {
+        if (!team) return '—';
+        return team.abbreviation || teamName(team);
+      }
+
       function formatScore(runs) {
         if (runs === 1) return '1\u2009';
         return runs;
@@ -268,15 +276,26 @@
       }
       
       var GAP = 4;
-      var MIN_BOX = 90;
+      var MIN_BOX_FULL = 90;
+      var MIN_BOX_ABBREV = 58;
 
       function updateGameWidth() {
         var games = outEl.querySelectorAll('.game');
         if (games.length === 0) return;
         var w = outEl.clientWidth;
-        var cols = Math.max(1, Math.floor((w + GAP) / (MIN_BOX + GAP)));
-        var boxWidth = (w - (cols - 1) * GAP) / cols;
-        outEl.style.setProperty('--game-width', boxWidth + 'px');
+        var colsFull = Math.max(1, Math.floor((w + GAP) / (MIN_BOX_FULL + GAP)));
+        var colsAbbrev = Math.max(1, Math.floor((w + GAP) / (MIN_BOX_ABBREV + GAP)));
+        var boxWidthFull = (w - (colsFull - 1) * GAP) / colsFull;
+        outEl.style.setProperty('--game-width', boxWidthFull + 'px');
+        outEl.classList.remove('abbrev');
+        var last = games[games.length - 1];
+        var overflows = last && last.getBoundingClientRect().bottom > window.innerHeight;
+        var abbrevWouldHelp = colsAbbrev > colsFull;
+        if (overflows && abbrevWouldHelp) {
+          var boxWidthAbbrev = (w - (colsAbbrev - 1) * GAP) / colsAbbrev;
+          outEl.style.setProperty('--game-width', boxWidthAbbrev + 'px');
+          outEl.classList.add('abbrev');
+        }
       }
 
       function render(games) {
@@ -303,8 +322,8 @@
           return (
             '<div class="game">' +
               '<div class="game-teams">' +
-                '<div class="row"><span class="team away">' + teamLogo(away) + '<span class="' + awayNameClass + '">' + teamName(away) + '</span></span>' + awayScoreHtml + '</div>' +
-                '<div class="row"><span class="team home">' + teamLogo(home) + '<span class="' + homeNameClass + '">' + teamName(home) + '</span></span>' + homeScoreHtml + '</div>' +
+                '<div class="row"><span class="team away">' + teamLogo(away) + '<span class="' + awayNameClass + ' long">' + teamName(away) + '</span><span class="' + awayNameClass + ' short">' + teamAbbrev(away) + '</span></span>' + awayScoreHtml + '</div>' +
+                '<div class="row"><span class="team home">' + teamLogo(home) + '<span class="' + homeNameClass + ' long">' + teamName(home) + '</span><span class="' + homeNameClass + ' short">' + teamAbbrev(home) + '</span></span>' + homeScoreHtml + '</div>' +
               '</div>' +
               '<div class="status">' + statusText(g) + '</div>' +
             '</div>'
