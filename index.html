@@ -30,12 +30,13 @@
     #api-key { min-width: 16em; }
     .date-row button {
       padding: 0.35rem 0.75rem;
-      font-size: 0.9rem;
+      font-size: 0.4rem;
       cursor: pointer;
     }
     #out {
       display: flex;
       flex-wrap: wrap;
+      justify-content: center;
       gap: 4px;
     }
     .game {
@@ -75,6 +76,7 @@
     .team-name {
       font-size: 0.75rem;
     }
+    .team-name.winner { font-weight: bold; }
     @container (max-width: 130px) { .team { font-size: 0.65rem; } .team-name { font-size: 0.65rem; } }
     @container (max-width: 100px) { .team { font-size: 0.55rem; } .team-name { font-size: 0.55rem; } }
     .team img {
@@ -93,6 +95,8 @@
     .loading, .error { font-size: 0.9rem; margin-top: 0.5rem; }
     .error { color: #c00; }
     .empty { color: #666; font-style: italic; }
+    body.inputs-hidden > .date-row { display: none; }
+    body.inputs-hidden { margin-bottom: 0; }
   </style>
 </head>
 <body>
@@ -240,11 +244,18 @@
           var home = g.home_team;
           var awayRuns = g.away_team_data && g.away_team_data.runs != null ? g.away_team_data.runs : '–';
           var homeRuns = g.home_team_data && g.home_team_data.runs != null ? g.home_team_data.runs : '–';
+          var isFinal = g.status === 'STATUS_FINAL';
+          var awayNum = typeof awayRuns === 'number' ? awayRuns : null;
+          var homeNum = typeof homeRuns === 'number' ? homeRuns : null;
+          var awayWins = isFinal && awayNum != null && homeNum != null && awayNum > homeNum;
+          var homeWins = isFinal && awayNum != null && homeNum != null && homeNum > awayNum;
+          var awayNameClass = 'team-name' + (awayWins ? ' winner' : '');
+          var homeNameClass = 'team-name' + (homeWins ? ' winner' : '');
           return (
             '<div class="game">' +
               '<div class="game-teams">' +
-                '<div class="row"><span class="team">' + teamLogo(away) + '<span class="team-name">' + teamName(away) + '</span></span><span class="score">' + formatScore(awayRuns) + '</span></div>' +
-                '<div class="row"><span class="team">' + teamLogo(home) + '<span class="team-name">' + teamName(home) + '</span></span><span class="score">' + formatScore(homeRuns) + '</span></div>' +
+                '<div class="row"><span class="team">' + teamLogo(away) + '<span class="' + awayNameClass + '">' + teamName(away) + '</span></span><span class="score">' + formatScore(awayRuns) + '</span></div>' +
+                '<div class="row"><span class="team">' + teamLogo(home) + '<span class="' + homeNameClass + '">' + teamName(home) + '</span></span><span class="score">' + formatScore(homeRuns) + '</span></div>' +
               '</div>' +
               '<div class="status">' + statusText(g.status, g.period) + '</div>' +
             '</div>'
@@ -277,6 +288,11 @@
       goBtn.addEventListener('click', load);
       dateEl.addEventListener('change', load);
       window.addEventListener('resize', updateGameWidth);
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'h' || e.key === 'H') {
+          document.body.classList.toggle('inputs-hidden');
+        }
+      });
       load();
     })();
   </script>
