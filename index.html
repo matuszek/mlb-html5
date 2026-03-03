@@ -305,11 +305,38 @@
         }
       }
 
+      function isPhilliesGame(g) {
+        var away = g.away_team;
+        var home = g.home_team;
+        function isPhillies(t) {
+          return t && (t.name === 'Phillies' || t.abbreviation === 'PHI' || (t.short_display_name && t.short_display_name.indexOf('Phillies') >= 0));
+        }
+        return isPhillies(away) || isPhillies(home);
+      }
+
+      function isOriolesGame(g) {
+        var away = g.away_team;
+        var home = g.home_team;
+        function isOrioles(t) {
+          return t && (t.name === 'Orioles' || t.abbreviation === 'BAL' || (t.short_display_name && t.short_display_name.indexOf('Orioles') >= 0));
+        }
+        return isOrioles(away) || isOrioles(home);
+      }
+
+      function gameOrderTier(g) {
+        if (isPhilliesGame(g)) return 0;
+        if (isOriolesGame(g)) return 1;
+        return 2;
+      }
+
       function render(games) {
         if (!games || games.length === 0) {
           outEl.innerHTML = '<p class="empty">No games on this date.</p>';
           return;
         }
+        games = games.slice().sort(function (a, b) {
+          return gameOrderTier(a) - gameOrderTier(b);
+        });
         var showScoreStatuses = ['STATUS_FINAL', 'STATUS_IN_PROGRESS', 'STATUS_SUSPENDED', 'STATUS_DELAYED'];
         outEl.innerHTML = games.map(function (g) {
           var away = g.away_team;
