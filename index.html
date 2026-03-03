@@ -71,7 +71,7 @@
       align-items: center;
       gap: 3px;
       min-width: 0;
-      overflow: hidden;
+      overflow: visible;
     }
     .team-name {
       font-size: 0.75rem;
@@ -84,6 +84,10 @@
       width: auto;
       flex-shrink: 0;
       vertical-align: middle;
+      transform: scale(1.5);
+      transform-origin: center center;
+      position: relative;
+      z-index: 1;
     }
     .score { font-size: 0.8rem; font-weight: 600; min-width: 1.5ch; text-align: right; }
     .status {
@@ -170,7 +174,7 @@
         'brewers': 158, 'milwaukee brewers': 158, 'milwaukee': 158,
         'pirates': 134, 'pittsburgh pirates': 134, 'pittsburgh': 134,
         'cardinals': 138, 'st. louis cardinals': 138, 'st louis cardinals': 138, 'st. louis': 138, 'st louis': 138,
-        'diamondbacks': 109, 'arizona diamondbacks': 109, 'arizona': 109, 'd-backs': 109, 'dbacks': 109,
+        'diamondbacks': 109, 'arizona diamondbacks': 109, 'arizona': 109, 'd-backs': 109, 'd\'backs': 109, 'dbacks': 109,
         'rockies': 115, 'colorado rockies': 115, 'colorado': 115,
         'dodgers': 119, 'los angeles dodgers': 119, 'la dodgers': 119,
         'padres': 135, 'san diego padres': 135, 'san diego': 135,
@@ -185,6 +189,8 @@
 
       function teamName(team) {
         if (!team) return '—';
+        if (team.short_display_name === 'Braves') return 'Atlanta';
+        if (team.short_display_name === 'Diamondbacks') return 'D\'backs';
         return team.short_display_name || team.display_name || team.name || '—';
       }
 
@@ -209,14 +215,22 @@
         return ordinal(n);
       }
 
-      function statusText(status, n) {
-        if (!status) return '';
+      function statusText(game) {
+        if (!game.status) return '';
+        var status = game.status;
+        var n = game.period;
         switch (status) {
           case 'STATUS_FINAL':
             return 'F';
           case 'STATUS_IN_PROGRESS':
             // return inningText(n);
             return n;
+          case 'STATUS_SCHEDULED':
+            if (!game.date) return '';
+            var t = game.date.split('T')[1];
+            if (!t) return '';
+            var parts = t.split(':');
+            return (parts[0] && parts[1] ? parts[0] + ':' + parts[1] : '');
           case 'STATUS_NOT_STARTED':
             return 'Not Started';
           case 'STATUS_SUSPENDED':
@@ -251,11 +265,13 @@
           outEl.innerHTML = '<p class="empty">No games on this date.</p>';
           return;
         }
+        var showScoreStatuses = ['STATUS_FINAL', 'STATUS_IN_PROGRESS', 'STATUS_SUSPENDED', 'STATUS_DELAYED'];
         outEl.innerHTML = games.map(function (g) {
           var away = g.away_team;
           var home = g.home_team;
           var awayRuns = g.away_team_data && g.away_team_data.runs != null ? g.away_team_data.runs : '–';
           var homeRuns = g.home_team_data && g.home_team_data.runs != null ? g.home_team_data.runs : '–';
+          var showScores = showScoreStatuses.indexOf(g.status) >= 0;
           var isFinal = g.status === 'STATUS_FINAL';
           var awayNum = typeof awayRuns === 'number' ? awayRuns : null;
           var homeNum = typeof homeRuns === 'number' ? homeRuns : null;
@@ -263,13 +279,15 @@
           var homeWins = isFinal && awayNum != null && homeNum != null && homeNum > awayNum;
           var awayNameClass = 'team-name' + (awayWins ? ' winner' : '');
           var homeNameClass = 'team-name' + (homeWins ? ' winner' : '');
+          var awayScoreHtml = showScores ? '<span class="score">' + formatScore(awayRuns) + '</span>' : '';
+          var homeScoreHtml = showScores ? '<span class="score">' + formatScore(homeRuns) + '</span>' : '';
           return (
             '<div class="game">' +
               '<div class="game-teams">' +
-                '<div class="row"><span class="team">' + teamLogo(away) + '<span class="' + awayNameClass + '">' + teamName(away) + '</span></span><span class="score">' + formatScore(awayRuns) + '</span></div>' +
-                '<div class="row"><span class="team">' + teamLogo(home) + '<span class="' + homeNameClass + '">' + teamName(home) + '</span></span><span class="score">' + formatScore(homeRuns) + '</span></div>' +
+                '<div class="row"><span class="team">' + teamLogo(away) + '<span class="' + awayNameClass + '">' + teamName(away) + '</span></span>' + awayScoreHtml + '</div>' +
+                '<div class="row"><span class="team">' + teamLogo(home) + '<span class="' + homeNameClass + '">' + teamName(home) + '</span></span>' + homeScoreHtml + '</div>' +
               '</div>' +
-              '<div class="status">' + statusText(g.status, g.period) + '</div>' +
+              '<div class="status">' + statusText(g) + '</div>' +
             '</div>'
           );
         }).join('');
