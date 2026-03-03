@@ -126,6 +126,7 @@
     <label for="date">Date</label>
     <input type="date" id="date" />
     <button type="button" id="go">Go</button>
+    <button type="button" id="today">Today</button>
   </div>
   <div class="date-row">
     <label for="api-key">API key</label>
@@ -138,6 +139,7 @@
 
       const dateEl = document.getElementById('date');
       const goBtn = document.getElementById('go');
+      const todayBtn = document.getElementById('today');
       const outEl = document.getElementById('out');
       const apiKeyEl = document.getElementById('api-key');
       var STORAGE_KEY = 'mlb-api-key';
@@ -218,6 +220,12 @@
         if (team.short_display_name === 'Braves') return 'Atlanta';
         if (team.short_display_name === 'Diamondbacks') return 'D\'backs';
         return team.short_display_name || team.display_name || team.name || '—';
+      }
+
+      function teamNameForDisplay(name) {
+        var i = (name || '').lastIndexOf(' ');
+        if (i >= 0) return name.slice(0, i) + '\u00A0' + name.slice(i + 1);
+        return name || '—';
       }
 
       function teamAbbrev(team) {
@@ -357,8 +365,8 @@
           return (
             '<div class="game">' +
               '<div class="game-teams">' +
-                '<div class="row"><span class="team away">' + teamLogo(away) + '<span class="' + awayNameClass + ' long">' + teamName(away) + '</span><span class="' + awayNameClass + ' short">' + teamAbbrev(away) + '</span></span>' + awayScoreHtml + '</div>' +
-                '<div class="row"><span class="team home">' + teamLogo(home) + '<span class="' + homeNameClass + ' long">' + teamName(home) + '</span><span class="' + homeNameClass + ' short">' + teamAbbrev(home) + '</span></span>' + homeScoreHtml + '</div>' +
+                '<div class="row"><span class="team away">' + teamLogo(away) + '<span class="' + awayNameClass + ' long">' + teamNameForDisplay(teamName(away)) + '</span><span class="' + awayNameClass + ' short">' + teamAbbrev(away) + '</span></span>' + awayScoreHtml + '</div>' +
+                '<div class="row"><span class="team home">' + teamLogo(home) + '<span class="' + homeNameClass + ' long">' + teamNameForDisplay(teamName(home)) + '</span><span class="' + homeNameClass + ' short">' + teamAbbrev(home) + '</span></span>' + homeScoreHtml + '</div>' +
               '</div>' +
               '<div class="status ' + (g.status === 'STATUS_SCHEDULED' ? 'status-time' : 'status-state') + '">' + statusText(g) + '</div>' +
             '</div>'
@@ -389,7 +397,15 @@
       }
 
       goBtn.addEventListener('click', load);
+      todayBtn.addEventListener('click', function () {
+        dateEl.value = today();
+        saveDate();
+        load();
+      });
       dateEl.addEventListener('change', saveDate);
+      dateEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') load();
+      });
       window.addEventListener('resize', updateGameWidth);
       document.addEventListener('keydown', function (e) {
         if (e.key === 'h' || e.key === 'H') {
