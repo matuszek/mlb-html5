@@ -325,7 +325,7 @@
       }
 
       goBtn.addEventListener('click', load);
-      dateEl.addEventListener('change', function () { saveDate(); load(); });
+      dateEl.addEventListener('change', saveDate);
       window.addEventListener('resize', updateGameWidth);
       document.addEventListener('keydown', function (e) {
         if (e.key === 'h' || e.key === 'H') {
