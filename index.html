@@ -119,6 +119,18 @@
       const goBtn = document.getElementById('go');
       const outEl = document.getElementById('out');
       const apiKeyEl = document.getElementById('api-key');
+      var STORAGE_KEY = 'mlb-api-key';
+
+      try {
+        var saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) apiKeyEl.value = saved;
+      } catch (e) {}
+
+      apiKeyEl.addEventListener('input', function () {
+        try {
+          localStorage.setItem(STORAGE_KEY, apiKeyEl.value);
+        } catch (e) {}
+      });
 
       function today() {
         const d = new Date();
