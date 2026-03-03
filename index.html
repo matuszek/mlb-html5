@@ -118,10 +118,21 @@
     .empty { color: #666; font-style: italic; }
     body.inputs-hidden > .date-row { display: none; }
     body.inputs-hidden { padding-bottom: 0; }
+    .cache-updated {
+      position: fixed;
+      bottom: 8px;
+      right: 8px;
+      font-size: 0.2rem;
+      color: #a7bd43;
+      pointer-events: none;
+      display: none;
+    }
+    .cache-updated.visible { display: block; }
   </style>
 </head>
 <body>
   <div id="out"></div>
+  <div id="cache-updated" class="cache-updated" aria-live="polite"></div>
   <div class="date-row">
     <label for="date">Date</label>
     <input type="date" id="date" />
@@ -136,46 +147,86 @@
   <script>
     (function () {
       const BASE = 'https://api.balldontlie.io';
+      const STORAGE_KEY = 'mlb-api-key';
+      const DATE_STORAGE_KEY = 'mlb-date';
+      const GAMES_CACHE_KEY = 'mlb-games-cache';
+      const GAP = 4;
+      const MIN_BOX_FULL = 90;
+      const MIN_BOX_ABBREV = 58;
+      const SHOW_SCORE_STATUSES = ['STATUS_FINAL', 'STATUS_IN_PROGRESS', 'STATUS_SUSPENDED', 'STATUS_DELAYED'];
+
+      var gamesCache = {};
+      try {
+        var stored = localStorage.getItem(GAMES_CACHE_KEY);
+        if (stored) gamesCache = JSON.parse(stored);
+      } catch (e) {}
+
+      function saveGamesCache() {
+        try { localStorage.setItem(GAMES_CACHE_KEY, JSON.stringify(gamesCache)); } catch (e) {}
+      }
+
+      function todayET() {
+        return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+      }
+
+      function getCacheExpiry(dateStr) {
+        var todayStr = todayET();
+        if (dateStr === todayStr) return Date.now() + 10 * 60 * 1000;
+        if (dateStr < todayStr) return null;
+        var parts = dateStr.split('-').map(Number);
+        return Date.UTC(parts[0], parts[1] - 1, parts[2], 8, 0, 0);
+      }
+
+      var cacheUpdatedEl = null;
+      function formatCacheTime(ts) {
+        var d = new Date(ts);
+        var h = d.getHours();
+        var m = d.getMinutes();
+        var s = d.getSeconds();
+        var ampm = h < 12 ? 'am' : 'pm';
+        h = h % 12 || 12;
+        return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0') + ' ' + ampm;
+      }
+      function showCacheUpdated(cachedAt) {
+        if (!cacheUpdatedEl) cacheUpdatedEl = document.getElementById('cache-updated');
+        if (!cacheUpdatedEl) return;
+        cacheUpdatedEl.textContent = 'Last updated at: ' + formatCacheTime(cachedAt);
+        cacheUpdatedEl.classList.add('visible');
+      }
+      function hideCacheUpdated() {
+        if (!cacheUpdatedEl) cacheUpdatedEl = document.getElementById('cache-updated');
+        if (cacheUpdatedEl) cacheUpdatedEl.classList.remove('visible');
+      }
 
       const dateEl = document.getElementById('date');
       const goBtn = document.getElementById('go');
       const todayBtn = document.getElementById('today');
       const outEl = document.getElementById('out');
       const apiKeyEl = document.getElementById('api-key');
-      var STORAGE_KEY = 'mlb-api-key';
-      var DATE_STORAGE_KEY = 'mlb-date';
 
       try {
         var saved = localStorage.getItem(STORAGE_KEY);
         if (saved) apiKeyEl.value = saved;
       } catch (e) {}
-
       apiKeyEl.addEventListener('input', function () {
-        try {
-          localStorage.setItem(STORAGE_KEY, apiKeyEl.value);
-        } catch (e) {}
+        try { localStorage.setItem(STORAGE_KEY, apiKeyEl.value); } catch (e) {}
       });
 
       function today() {
-        const d = new Date();
+        var d = new Date();
         return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
       }
-
       try {
         var savedDate = localStorage.getItem(DATE_STORAGE_KEY);
-        if (savedDate) dateEl.value = savedDate;
-        else dateEl.value = today();
+        dateEl.value = savedDate || today();
       } catch (e) {
         dateEl.value = today();
       }
-
       function saveDate() {
-        try {
-          localStorage.setItem(DATE_STORAGE_KEY, dateEl.value);
-        } catch (e) {}
+        try { localStorage.setItem(DATE_STORAGE_KEY, dateEl.value); } catch (e) {}
       }
 
-      // Map team name (any common variant) to MLB static logo ID. IDs from MLB.com/team CDN.
+      // Team name → logo ID (MLB CDN). Used for logo lookup only.
       var TEAM_NAME_TO_LOGO_ID = {
         'orioles': 110, 'baltimore orioles': 110, 'baltimore': 110,
         'red sox': 111, 'boston red sox': 111, 'boston': 111,
@@ -210,8 +261,7 @@
       };
       function teamNameToLogoUrl(name) {
         if (!name || typeof name !== 'string') return '';
-        var key = name.trim().toLowerCase();
-        var id = TEAM_NAME_TO_LOGO_ID[key];
+        var id = TEAM_NAME_TO_LOGO_ID[(name.trim().toLowerCase())];
         return id ? id + '.svg' : '';
       }
 
@@ -224,76 +274,48 @@
 
       function teamNameForDisplay(name) {
         var i = (name || '').lastIndexOf(' ');
-        if (i >= 0) return name.slice(0, i) + '\u00A0' + name.slice(i + 1);
-        return name || '—';
+        return i >= 0 ? name.slice(0, i) + '\u00A0' + name.slice(i + 1) : (name || '—');
       }
 
       function teamAbbrev(team) {
-        if (!team) return '—';
-        return team.abbreviation || teamName(team);
+        return (team && team.abbreviation) ? team.abbreviation : (team ? teamName(team) : '—');
       }
 
       function formatScore(runs) {
-        if (runs === 1) return '1\u2009';
-        return runs;
+        return runs === 1 ? '1\u2009' : runs;
       }
 
       function teamLogo(team) {
         if (!team) return '';
         var url = teamNameToLogoUrl(teamName(team));
-        if (!url) return '';
-        return '<img src="' + url + '" alt="" />';
+        return url ? '<img src="' + url + '" alt="" />' : '';
       }
 
-      function inningText(n) {
-        function ordinal(n) {
-          var s = ["th","st","nd","rd"],
-          v = n%100;
-          return n + (s[(v-20)%10] || s[v] || s[0]);
-        }
-        return ordinal(n);
+      function parseScheduledTime(dateStr) {
+        if (!dateStr) return '';
+        var t = dateStr.split('T')[1];
+        if (!t) return '';
+        var parts = t.split(':');
+        if (!parts[0] || !parts[1]) return '';
+        var hour12 = parseInt(parts[0], 10) % 12;
+        return (hour12 || 12) + ':' + parts[1];
       }
 
       function statusText(game) {
         if (!game.status) return '';
-        var status = game.status;
-        var n = game.period;
-        switch (status) {
-          case 'STATUS_FINAL':
-            return 'F';
-          case 'STATUS_IN_PROGRESS':
-            // return inningText(n);
-            return n;
-          case 'STATUS_SCHEDULED':
-            if (!game.date) return '';
-            var t = game.date.split('T')[1];
-            if (!t) return '';
-            var parts = t.split(':');
-            if (!parts[0] || !parts[1]) return '';
-            var hour24 = parseInt(parts[0], 10);
-            var hour12 = hour24 % 12;
-            if (hour12 === 0) hour12 = 12;
-            return hour12 + ':' + parts[1];
-          case 'STATUS_NOT_STARTED':
-            return 'Not Started';
-          case 'STATUS_SUSPENDED':
-            return 'Suspended';
-          case 'STATUS_DELAYED':
-            return 'Delayed';
-          case 'STATUS_POSTPONED':
-            return 'Postponed';
-          case 'STATUS_CANCELLED':
-            return 'Cancelled';
-          case 'STATUS_UNKNOWN':
-            return 'Unknown';
-          default:
-            return status;
+        switch (game.status) {
+          case 'STATUS_FINAL': return 'F';
+          case 'STATUS_IN_PROGRESS': return game.period;
+          case 'STATUS_SCHEDULED': return parseScheduledTime(game.date);
+          case 'STATUS_NOT_STARTED': return 'Not Started';
+          case 'STATUS_SUSPENDED': return 'Suspended';
+          case 'STATUS_DELAYED': return 'Delayed';
+          case 'STATUS_POSTPONED': return 'Postponed';
+          case 'STATUS_CANCELLED': return 'Cancelled';
+          case 'STATUS_UNKNOWN': return 'Unknown';
+          default: return game.status;
         }
       }
-      
-      var GAP = 4;
-      var MIN_BOX_FULL = 90;
-      var MIN_BOX_ABBREV = 58;
 
       function updateGameWidth() {
         var games = outEl.querySelectorAll('.game');
@@ -314,27 +336,16 @@
         }
       }
 
-      function isPhilliesGame(g) {
-        var away = g.away_team;
-        var home = g.home_team;
-        function isPhillies(t) {
-          return t && (t.name === 'Phillies' || t.abbreviation === 'PHI' || (t.short_display_name && t.short_display_name.indexOf('Phillies') >= 0));
+      function isTeamInGame(g, name, abbr) {
+        function hasTeam(t) {
+          return t && (t.name === name || t.abbreviation === abbr || (t.short_display_name && t.short_display_name.indexOf(name) >= 0));
         }
-        return isPhillies(away) || isPhillies(home);
-      }
-
-      function isOriolesGame(g) {
-        var away = g.away_team;
-        var home = g.home_team;
-        function isOrioles(t) {
-          return t && (t.name === 'Orioles' || t.abbreviation === 'BAL' || (t.short_display_name && t.short_display_name.indexOf('Orioles') >= 0));
-        }
-        return isOrioles(away) || isOrioles(home);
+        return hasTeam(g.away_team) || hasTeam(g.home_team);
       }
 
       function gameOrderTier(g) {
-        if (isPhilliesGame(g)) return 0;
-        if (isOriolesGame(g)) return 1;
+        if (isTeamInGame(g, 'Phillies', 'PHI')) return 0;
+        if (isTeamInGame(g, 'Orioles', 'BAL')) return 1;
         return 2;
       }
 
@@ -346,13 +357,12 @@
         games = games.slice().sort(function (a, b) {
           return gameOrderTier(a) - gameOrderTier(b);
         });
-        var showScoreStatuses = ['STATUS_FINAL', 'STATUS_IN_PROGRESS', 'STATUS_SUSPENDED', 'STATUS_DELAYED'];
         outEl.innerHTML = games.map(function (g) {
           var away = g.away_team;
           var home = g.home_team;
-          var awayRuns = g.away_team_data && g.away_team_data.runs != null ? g.away_team_data.runs : '–';
-          var homeRuns = g.home_team_data && g.home_team_data.runs != null ? g.home_team_data.runs : '–';
-          var showScores = showScoreStatuses.indexOf(g.status) >= 0;
+          var awayRuns = (g.away_team_data && g.away_team_data.runs != null) ? g.away_team_data.runs : '–';
+          var homeRuns = (g.home_team_data && g.home_team_data.runs != null) ? g.home_team_data.runs : '–';
+          var showScores = SHOW_SCORE_STATUSES.indexOf(g.status) >= 0;
           var isFinal = g.status === 'STATUS_FINAL';
           var awayNum = typeof awayRuns === 'number' ? awayRuns : null;
           var homeNum = typeof homeRuns === 'number' ? homeRuns : null;
@@ -375,8 +385,15 @@
         updateGameWidth();
       }
 
-      function load() {
-        var date = dateEl.value || today();
+      function load(date) {
+        var entry = gamesCache[date];
+        if (entry && (entry.expiresAt === null || Date.now() < entry.expiresAt)) {
+          render(entry.data);
+          if (entry.cachedAt != null) showCacheUpdated(entry.cachedAt);
+          return;
+        }
+
+        hideCacheUpdated();
         outEl.innerHTML = '<p class="loading">Loading…</p>';
 
         var url = BASE + '/mlb/v1/games?dates[]=' + encodeURIComponent(date) + '&per_page=50';
@@ -388,23 +405,29 @@
             return r.json();
           })
           .then(function (json) {
-            var data = json.data;
-            render(Array.isArray(data) ? data : []);
+            var data = Array.isArray(json.data) ? json.data : [];
+            var cachedAt = Date.now();
+            gamesCache[date] = { data: data, expiresAt: getCacheExpiry(date), cachedAt: cachedAt };
+            saveGamesCache();
+            render(data);
+            showCacheUpdated(cachedAt);
           })
           .catch(function (err) {
+            delete gamesCache[date];
+            saveGamesCache();
             outEl.innerHTML = '<p class="error">' + (err.message || 'Failed to load games.') + '</p>';
           });
       }
 
-      goBtn.addEventListener('click', load);
+      goBtn.addEventListener('click', function () { load(dateEl.value || today()); });
       todayBtn.addEventListener('click', function () {
         dateEl.value = today();
         saveDate();
-        load();
+        load(dateEl.value);
       });
       dateEl.addEventListener('change', saveDate);
       dateEl.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') load();
+        if (e.key === 'Enter') load(dateEl.value || today());
       });
       window.addEventListener('resize', updateGameWidth);
       document.addEventListener('keydown', function (e) {
@@ -412,7 +435,7 @@
           document.body.classList.toggle('inputs-hidden');
         }
       });
-      load();
+      load(dateEl.value || today());
     })();
   </script>
 </body>
