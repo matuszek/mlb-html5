@@ -153,7 +153,9 @@
     <label for="date">Date</label>
     <input type="date" id="date" />
     <button type="button" id="go">Go</button>
+    <button type="button" id="prev-day" aria-label="Previous day">&lt;</button>
     <button type="button" id="today">Today</button>
+    <button type="button" id="next-day" aria-label="Next day">&gt;</button>
   </div>
   <div class="date-row">
     <label for="api-key">API key</label>
@@ -216,7 +218,9 @@
 
       const dateEl = document.getElementById('date');
       const goBtn = document.getElementById('go');
+      const prevDayBtn = document.getElementById('prev-day');
       const todayBtn = document.getElementById('today');
+      const nextDayBtn = document.getElementById('next-day');
       const outEl = document.getElementById('out');
       const apiKeyEl = document.getElementById('api-key');
 
@@ -246,6 +250,15 @@
       }
       function saveDate() {
         try { localStorage.setItem(DATE_STORAGE_KEY, dateEl.value); } catch (e) {}
+      }
+
+
+      function loadDisplayedDate(deltaDays) {
+        var current = dateEl.value || today();
+        var next = shiftDate(current, deltaDays);
+        dateEl.value = next;
+        saveDate();
+        load(next);
       }
 
       // Team name → logo ID (MLB CDN). Used for logo lookup only.
@@ -466,11 +479,13 @@
       }
 
       goBtn.addEventListener('click', function () { load(dateEl.value || today()); });
+      prevDayBtn.addEventListener('click', function () { loadDisplayedDate(-1); });
       todayBtn.addEventListener('click', function () {
         dateEl.value = today();
         saveDate();
         load(dateEl.value);
       });
+      nextDayBtn.addEventListener('click', function () { loadDisplayedDate(1); });
       dateEl.addEventListener('change', saveDate);
       dateEl.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') load(dateEl.value || today());
