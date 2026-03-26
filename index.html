@@ -232,6 +232,12 @@
         var d = new Date();
         return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
       }
+
+      function shiftDate(dateStr, days) {
+        var d = new Date(dateStr + 'T00:00:00Z');
+        d.setUTCDate(d.getUTCDate() + days);
+        return d.toISOString().slice(0, 10);
+      }
       try {
         var savedDate = localStorage.getItem(DATE_STORAGE_KEY);
         dateEl.value = savedDate || today();
@@ -309,12 +315,20 @@
 
       function parseScheduledTime(dateStr) {
         if (!dateStr) return '';
-        var t = dateStr.split('T')[1];
-        if (!t) return '';
-        var parts = t.split(':');
-        if (!parts[0] || !parts[1]) return '';
-        var hour12 = parseInt(parts[0], 10) % 12;
-        return (hour12 || 12) + ':' + parts[1];
+        var d = new Date(dateStr);
+        if (isNaN(d.getTime())) return '';
+        var h = d.getHours();
+        var m = d.getMinutes();
+        var hour12 = h % 12;
+        return (hour12 || 12) + ':' + String(m).padStart(2, '0');
+      }
+
+
+      function gameDateET(dateStr) {
+        if (!dateStr) return '';
+        var d = new Date(dateStr);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
       }
 
       function statusText(game) {
@@ -412,7 +426,11 @@
         hideCacheUpdated();
         outEl.innerHTML = '<p class="loading">Loading…</p>';
 
-        var url = BASE + '/mlb/v1/games?dates[]=' + encodeURIComponent(date) + '&per_page=50';
+        var nextDate = shiftDate(date, 1);
+        var url = BASE
+          + '/mlb/v1/games?dates[]=' + encodeURIComponent(date)
+          + '&dates[]=' + encodeURIComponent(nextDate)
+          + '&per_page=100';
         fetch(url, {
           headers: { 'Authorization': apiKeyEl.value.trim() }
         })
@@ -425,7 +443,10 @@
             return r.json();
           })
           .then(function (json) {
-            var data = Array.isArray(json.data) ? json.data : [];
+            var allData = Array.isArray(json.data) ? json.data : [];
+            var data = allData.filter(function (g) {
+              return gameDateET(g.date) === date;
+            });
             var cachedAt = Date.now();
             gamesCache[date] = { data: data, expiresAt: getCacheExpiry(date), cachedAt: cachedAt };
             saveGamesCache();
